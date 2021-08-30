@@ -38,25 +38,31 @@ errorCount = 0
 
 def waitIfNeeded(response):
     headers = response.headers
+    print(headers)
     ratelimitRemaining = float(headers["x-ratelimit-remaining"])
     ratelimitReset = float(headers["x-ratelimit-reset"])
     if ratelimitRemaining < 5:
         print("WARNING: ratelimit close, sleep for "+str(ratelimitReset)+"s")
         time.sleep(ratelimitReset)
     
-def processResponse(user, responseText):
+def processResponse(user, responseText, k):
+    global successCount, errorCount
     try:
         jsonData = json.loads(responseText)
         errors = jsonData["json"]["errors"]
         if len(errors) == 0:
             successCount += 1
-            print(user+" approved successfully!")
-        else:
-            errorCount += 1
-            print("ERROR approving "+user+". Error message: "+str(errors))
+            print(str(k)+" | "+user+" approved successfully!")
+            return False
+        if errors[0][0] == 'SUBREDDIT_RATELIMIT': #for some reason there is a second undocummented rate-limit...
+            return True
+        errorCount += 1
+        print(str(k)+" | "+"ERROR approving "+user+". Error message: "+str(errors))
+        return False
     except:
         errorCount += 1
-        print("WARNING with approving "+user+"??? Response cannot be read!")
+        print(str(k)+" | "+"WARNING with approving "+user+"??? Response cannot be read!")
+        return False
 
 
 ####################
@@ -88,11 +94,19 @@ print("token refreshed: "+x.text)
 print("Approving users")
 print("")
 
+k = 0
+
 for user in userList:
     data = {'api_type': 'json', 'name': user, 'type': 'contributor'}
     x = requests.post(urlApprove, data = data, headers = headers)
-    processResponse(user, x.text)
+    retry = processResponse(user, x.text, k)
+    while retry:
+        print("WARNING: RATE-LIMIT, sleep 1min")
+        time.sleep(60)
+        x = requests.post(urlApprove, data = data, headers = headers)
+        retry = processResponse(user, x.text, k)
     waitIfNeeded(x)
+    k =+ 1
 
 print("")
 print("Done!")
