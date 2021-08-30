@@ -101,8 +101,8 @@ for user in userList:
     x = requests.post(urlApprove, data = data, headers = headers)
     retry = processResponse(user, x.text, k)
     while retry:
-        print("WARNING: RATE-LIMIT, sleep 1min")
-        time.sleep(60)
+        print("WARNING: RATE-LIMIT, sleep 15min. Anti-abuse rate limit is 100 requests per 2h (see https://redd.it/ihw3u3/). If you stop this script, then regenerate the list to purge already approved user before starting it again.")
+        time.sleep(900)
         x = requests.post(urlApprove, data = data, headers = headers)
         retry = processResponse(user, x.text, k)
     waitIfNeeded(x)
