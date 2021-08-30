@@ -25,9 +25,11 @@ from generatedFiles.configuration import conf
 outputFilename = "generatedFiles/flaired_user_list.py"
 urlFlair = 'http://oauth.reddit.com/r/'+conf['subreddit']+'/api/flairlist.json?limit=1000'
 urlBanned = 'http://oauth.reddit.com/r/'+conf['subreddit']+'/about/banned?limit=100'
+urlContributor = 'http://oauth.reddit.com/r/'+conf['subreddit']+'/about/contributors?limit=100'
 
 flairedUserList = set()
 bannedUserList = set()
+contributorList = set()
 
 
 
@@ -55,6 +57,20 @@ def processBannedResponseJSON(response_text):
     for user in users:
         username = user['name']
         bannedUserList.add(username)
+    next = jsonData['data'].get('after', '')
+    if not next:
+        next = ''
+    return next
+
+def processContributorResponseJSON(response_text):
+    jsonData = json.loads(response_text)
+    if 'data' not in jsonData or 'children' not in jsonData['data']:
+        print("Error no users")
+        return ''
+    users = jsonData['data']['children']
+    for user in users:
+        username = user['name']
+        contributorList.add(username)
     next = jsonData['data'].get('after', '')
     if not next:
         next = ''
@@ -137,13 +153,34 @@ while next != '':
     
 print("Found "+str(len(bannedUserList))+" banned users.")
 
+# Get contributor data
+print("Fetch contributor data")
+k=1
+
+url = urlContributor
+x = requests.get(url, headers = headers)
+next = processContributorResponseJSON(x.text)
+print(str(k)+" | "+url+" | "+next)
+
+while next != '':
+    k+=1
+    url = urlContributor+'&after='+next
+    x = requests.get(url, headers = headers)
+    next = processContributorResponseJSON(x.text)
+    if not next:
+        next = ''
+    print(str(k)+" | "+url+" | "+next)
+    waitIfNeeded(x)
+    
+print("Found "+str(len(contributorList))+" banned users.")
+
 
 # Only get flaired not banned users
 userList = []
 for user in flairedUserList:
-    if user not in bannedUserList:
+    if user not in bannedUserList and user not in contributorList:
         userList.append(user)
-print(str(len(userList))+" users flaired and not banned (from "+str(len(flairedUserList))+" flaired users).")
+print(str(len(userList))+" users flaired and not banned or already contributors (from "+str(len(flairedUserList))+" flaired users).")
 
 # Generate output file
 with open(outputFilename, 'w') as out_file:
